@@ -1,0 +1,6 @@
+ERROR: 2025/07/18 13:58:15 embeddingService.go:35: Failed to download model:  model has multiple .onnx files, please specify one of the following onnxFilePaths: onnx/model.onnx onnx/model_O1.onnx onnx/model_O2.onnx onnx/model_O3.onnx onnx/model_O4.onnx onnx/model_qint8_arm64.onnx onnx/model_qint8_avx512.onnx onnx/model_qint8_avx512_vnni.onnx onnx/model_quint8_avx2.onnx
+ERROR: 2025/07/18 13:58:15 main.go:38: model has multiple .onnx files, please specify one of the following onnxFilePaths: onnx/model.onnx onnx/model_O1.onnx onnx/model_O2.onnx onnx/model_O3.onnx onnx/model_O4.onnx onnx/model_qint8_arm64.onnx onnx/model_qint8_avx512.onnx onnx/model_qint8_avx512_vnni.onnx onnx/model_quint8_avx2.onnx
+ERROR: 2025/07/18 14:42:09 embeddingService.go:37: Failed to download model:  failed to download sentence-transformers/all-MiniLM-L6-v2 after 5 attempts
+ERROR: 2025/07/18 14:42:09 main.go:38: failed to download sentence-transformers/all-MiniLM-L6-v2 after 5 attempts
+ERROR: 2025/07/18 22:24:55 embeddingService.go:37: Failed to download model:  failed to download sentence-transformers/all-MiniLM-L6-v2 after 5 attempts
+ERROR: 2025/07/18 22:24:55 main.go:39: failed to download sentence-transformers/all-MiniLM-L6-v2 after 5 attempts
