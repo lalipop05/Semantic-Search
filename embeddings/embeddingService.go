@@ -1,141 +1,84 @@
 package embeddings
 
 import (
-	"fmt"
 	"mySearchEngine/storage"
 	"mySearchEngine/utils"
-	"strings"
 
-	"github.com/knights-analytics/hugot"
-	"github.com/knights-analytics/hugot/pipelines"
+	"github.com/sugarme/tokenizer"
+	"github.com/sugarme/tokenizer/pretrained"
+	ort "github.com/yalue/onnxruntime_go"
 )
 
-const BATCHSIZEINBYTES = 1e5
-const MODELPATH = "sentence-transformers/all-MiniLM-L6-v2"
+const MODELPATH = "C:/College_UTD/Summer_2024/Models/Qdrant_bge-small-en-v1.5-onnx-Q/"
+const TOKENIZER_FILE_NAME = "tokenizer.json"
+const MODEL_FILENAME = "model_optimized.onnx"
+
+const ONNX_RUNTIME_PATH = "C:/College_UTD/Summer_2024/onnxruntime-win-x64-1.22.1/lib/onnxruntime.dll"
+
 
 type EmbeddingService struct {
-	session *hugot.Session
-	fePipeline *pipelines.FeatureExtractionPipeline
+	tokenizer *tokenizer.Tokenizer
 }
 
 func NewEmbeddingService() (*EmbeddingService, error) {
-	session, err := hugot.NewGoSession()
+	tk, err := pretrained.FromFile(MODELPATH+TOKENIZER_FILE_NAME)
 	if (err != nil) {
-		utils.ErrorLogger.Println("Failed to create hugot GoSession: ", err)
-		return nil, err
-	}
-	downloadOptions := hugot.NewDownloadOptions()
-	downloadOptions.OnnxFilePath = "onnx/model.onnx"  
-
-	
-
-	downloadedPath, err := hugot.DownloadModel(
-		MODELPATH,
-		"./models",
-		downloadOptions,
-	)
-	fmt.Println("------------------------------------")
-	if (err != nil) {
-		session.Destroy()
-		utils.ErrorLogger.Println("Failed to download model: ", err)
+		utils.ErrorLogger.Println(err)
 		return nil, err
 	}
 
-	fmt.Println("------------------------------------")
+	paddingParams := getPaddingParams()
+    tk.WithPadding(paddingParams)
 
-	config := hugot.FeatureExtractionConfig {
-		ModelPath: downloadedPath,
-		Name: "embeddings",
-	}
+	ort.SetSharedLibraryPath(ONNX_RUNTIME_PATH)
 
-	fePipeline, err := hugot.NewPipeline(session, config)
-	if (err != nil) {
-		session.Destroy()
-		utils.ErrorLogger.Println("Failed to set up pipeline: ", err)
+	err = ort.InitializeEnvironment()
+	if err != nil {
+		utils.Error(err)
 		return nil, err
 	}
+
 
 	return &EmbeddingService{
-		session: session,
-		fePipeline: fePipeline,
+		tokenizer: tk,
 	}, err
-
 }
 
-func (es *EmbeddingService) GetBatchEmbeddings(metaData []*storage.PagesMetaData) ([][]float32, []error) {
-	embeddings := [][]float32{}
-	errs := []error{}
-
-	batch := []string{}
-	var batchSize int = 0
-
-	for _, data := range metaData {
-		s := generateEmbeddingString(data)
-		batch = append(batch, s)
-		batchSize += len(s)
-		if (batchSize >= BATCHSIZEINBYTES) {
-			responseEmbeddings, err := es.processBatch(batch)
-			if (err != nil) {
-				errs = append(errs, err)
-			} else {
-				embeddings = append(embeddings, responseEmbeddings...)
-			}
-			batch = []string{}
-			batchSize = 0
-		}
-	}
-	if (batchSize != 0) {
-		responseEmbeddings, err := es.processBatch(batch)
-		if (err != nil) {
-			errs = append(errs, err)
-		} else {
-			embeddings = append(embeddings, responseEmbeddings...)
-		}
-	}
-
-	return embeddings, errs
+func getPaddingParams() *tokenizer.PaddingParams {
+	paddingStrat := tokenizer.NewPaddingStrategy(tokenizer.WithFixed(MODEL_SEQUENCE_LEN))
+    paddingParams := tokenizer.PaddingParams {
+        Strategy: *paddingStrat,
+        Direction: tokenizer.Right,
+    }
+	return &paddingParams
 }
 
-func (es *EmbeddingService) processBatch(texts []string) ([][]float32, error) {
-	output, err := es.fePipeline.RunPipeline(texts)
+func (es *EmbeddingService) Destroy() {
+	defer ort.DestroyEnvironment()
+}
+
+func (es *EmbeddingService) GenerateBatchEmbeddings(idx []uint64, data []*storage.PagesMetaData) ([]*EmbeddedPage, error) {
+	tokenizedPages, err := es.GetBatchTokens(idx, data)
 	if (err != nil) {
-		utils.ErrorLogger.Println("Could not run pipeline: ", err)
+		utils.Error(err)
 		return nil, err
 	}
-
-	embs := output.Embeddings
-	for i, emb := range embs {
-		fmt.Println(i, emb)
+	embeddedPages, err := es.ProduceEmbeddings(tokenizedPages)
+	if (err != nil) {
+		utils.Error(err)
+		return nil, err
 	}
-
-	return embs, nil
+	return embeddedPages, nil
 }
 
-func (es *EmbeddingService) Close() {
-	es.session.Destroy()
+
+type TokenizedPage struct {
+	Idx uint64
+	Tokens []*tokenizer.Encoding
 }
 
-func generateEmbeddingString(data *storage.PagesMetaData) string {
-	var builder strings.Builder
-	if (data.Title != "") {
-		builder.WriteString(data.Title)
-		builder.WriteString(". ")
-	}
-	if (data.MetaDescription != "") {
-		builder.WriteString(data.MetaDescription)
-		builder.WriteString(". ")
-	}
-	if (data.MetaKeyWords != "") {
-		builder.WriteString(data.MetaKeyWords)
-		builder.WriteString(". ")
-	}
-	if (data.Headings != nil) {
-		for _, heading := range data.Headings {
-			builder.WriteString(heading)
-			builder.WriteString(",")
-		}
-		builder.WriteString(". ")
-	}
-	builder.WriteString(data.Content)
-	return builder.String()
+type EmbeddedPage struct {
+	Idx uint64
+	Embeddings [][]float32
 }
+

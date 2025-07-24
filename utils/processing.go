@@ -25,3 +25,4 @@ func Normalize(content string) string {
 	normalized = regexp.MustCompile(`\s+`).ReplaceAllString(normalized, " ")
 	return normalized
 }
+

@@ -10,10 +10,11 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
+const MAXDEPTH = 1
+const PARALLELISM = 4
 func Crawl(url string, ch *chan storage.PagesMetaData) {
 
-	maxDepth, parallelism := 1, 4
-	c := initCrawler(maxDepth, parallelism)
+	c := initCrawler(MAXDEPTH, PARALLELISM)
 
 	c.OnHTML("a[href]", onATagCallBack())
 

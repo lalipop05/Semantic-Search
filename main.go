@@ -34,29 +34,24 @@ func main() {
 	defer storageManager.Close()
 
 	embeddingService, err := embeddings.NewEmbeddingService()
-	fmt.Println("------------------------------------")
-	if err != nil {
-		utils.ErrorLogger.Println(err)
-		panic(err)
+	if (err != nil) {
+		panic(utils.Error(err))
 	}
-	defer embeddingService.Close()
-	batch := []*storage.PagesMetaData{}
+	
+
+	
 
 	for value := range ch {
-		storageManager.InsertMetaDataIntoDB(&value)
-		batch = append(batch, &value)
-		//fmt.Println(len(batch))
-		if len(batch) == 10 {
-			_, errs := embeddingService.GetBatchEmbeddings(batch)
-			batch = []*storage.PagesMetaData{}
-			if len(errs) != 0 {
-				for _, err := range errs {
-					utils.ErrorLogger.Println(err)
-				}
-				panic("Problem with embeddingService.GetBatchEmbeddings()")
-			}
-
+		idx, err := storageManager.InsertMetaDataIntoDB(&value)
+		if (err != nil) {
+			panic(utils.Error(err))
 		}
+		embeddedPages, err := embeddingService.GenerateBatchEmbeddings([]uint64{idx}, []*storage.PagesMetaData{&value})
+		if (err != nil) {
+			panic(utils.Error(err))
+		}
+		fmt.Println(embeddedPages)
+		
 	}
 
 	end := time.Now()

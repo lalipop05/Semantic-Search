@@ -4,3 +4,32 @@ ERROR: 2025/07/18 14:42:09 embeddingService.go:37: Failed to download model:  fa
 ERROR: 2025/07/18 14:42:09 main.go:38: failed to download sentence-transformers/all-MiniLM-L6-v2 after 5 attempts
 ERROR: 2025/07/18 22:24:55 embeddingService.go:37: Failed to download model:  failed to download sentence-transformers/all-MiniLM-L6-v2 after 5 attempts
 ERROR: 2025/07/18 22:24:55 main.go:39: failed to download sentence-transformers/all-MiniLM-L6-v2 after 5 attempts
+ERROR: 2025/07/22 19:14:37 logger.go:34: <nil>
+ERROR: 2025/07/22 19:15:47 logger.go:34: <nil>
+ERROR: 2025/07/23 15:30:09 logger.go:34: Invalid input maxLen or stride (stride must be less than maxLen and maxLen must be greater than zero.)
+WARNING: 2025/07/23 17:03:57 vectorGeneration.go:17: Tensor shape and values shape does not match up!
+WARNING: 2025/07/23 17:03:57 vectorGeneration.go:17: Tensor shape and values shape does not match up!
+WARNING: 2025/07/23 17:05:27 vectorGeneration.go:17: Tensor shape and values shape does not match up!
+WARNING: 2025/07/23 17:05:27 vectorGeneration.go:17: Tensor shape and values shape does not match up!
+WARNING: 2025/07/23 17:06:07 vectorGeneration.go:17: Tensor shape and values shape does not match up!
+WARNING: 2025/07/23 17:06:07 vectorGeneration.go:17: Tensor shape and values shape does not match up!
+WARNING: 2025/07/23 17:06:41 vectorGeneration.go:17: Tensor shape and values shape does not match up!
+WARNING: 2025/07/23 17:06:41 vectorGeneration.go:17: Tensor shape and values shape does not match up!
+WARNING: 2025/07/23 17:07:45 vectorGeneration.go:17: Tensor shape and values shape does not match up!
+WARNING: 2025/07/23 17:07:45 vectorGeneration.go:17: Tensor shape and values shape does not match up!
+WARNING: 2025/07/23 17:10:34 vectorGeneration.go:17: Tensor shape and values shape does not match up!
+WARNING: 2025/07/23 17:10:34 vectorGeneration.go:17: Tensor shape and values shape does not match up!
+WARNING: 2025/07/23 17:14:53 vectorGeneration.go:17: Tensor shape and values shape does not match up!
+WARNING: 2025/07/23 17:14:53 vectorGeneration.go:17: Tensor shape and values shape does not match up!
+WARNING: 2025/07/23 17:15:31 vectorGeneration.go:17: Tensor shape and values shape does not match up!
+WARNING: 2025/07/23 17:15:31 vectorGeneration.go:17: Tensor shape and values shape does not match up!
+WARNING: 2025/07/23 17:18:23 vectorGeneration.go:17: Tensor shape and values shape does not match up!
+WARNING: 2025/07/23 17:18:23 vectorGeneration.go:17: Tensor shape and values shape does not match up!
+WARNING: 2025/07/24 15:22:07 vectorGeneration.go:17: Tensor shape and values shape does not match up!
+WARNING: 2025/07/24 15:22:07 vectorGeneration.go:17: Tensor shape and values shape does not match up!
+WARNING: 2025/07/24 15:23:55 vectorGeneration.go:17: Tensor shape and values shape does not match up!
+WARNING: 2025/07/24 15:23:55 vectorGeneration.go:17: Tensor shape and values shape does not match up!
+WARNING: 2025/07/24 15:25:34 vectorGeneration.go:17: Tensor shape and values shape does not match up!
+WARNING: 2025/07/24 15:25:34 vectorGeneration.go:17: Tensor shape and values shape does not match up!
+WARNING: 2025/07/24 15:27:18 vectorGeneration.go:17: Tensor shape and values shape does not match up!
+WARNING: 2025/07/24 15:27:18 vectorGeneration.go:17: Tensor shape and values shape does not match up!

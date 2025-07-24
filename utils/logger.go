@@ -30,3 +30,13 @@ func init() {
 }
 
 
+func Error(err error) error {
+    ErrorLogger.Println(err)
+    return err
+}
+
+func Warning(err error) error {
+    WarningLogger.Println(err)
+    return err
+}
+

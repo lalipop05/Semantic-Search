@@ -3,7 +3,6 @@ package storage
 import (
 	"database/sql"
 	"fmt"
-	"log"
 	"mySearchEngine/utils"
 	"os"
 	"strings"
@@ -18,14 +17,14 @@ func SetUpDataBase(driver string) (*StorageManager, error) {
 
 	err := os.MkdirAll("./database", 0755)
 	if err != nil {
-		fmt.Println(err)
+		utils.Error(err)
 		return nil, err
 	}
 
 	db, err := sql.Open(driver, "./database/test.db")
 
 	if err != nil {
-		fmt.Println(err)
+		utils.Error(err)
 		return nil, err
 	}
 
@@ -48,17 +47,17 @@ func SetUpDataBase(driver string) (*StorageManager, error) {
 	content_length INTEGER)`)
 
 	if err != nil {
-		fmt.Println(err)
+		utils.Error(err)
 		return &storageManager, err
 	}
 	return &storageManager, nil
 }
 
-func (storageManager StorageManager) InsertMetaDataIntoDB(data *PagesMetaData) error {
+func (storageManager StorageManager) InsertMetaDataIntoDB(data *PagesMetaData) (uint64, error) {
 
 	if storageManager.Cache.Exists(data) {
 		utils.CrawlLogger.Println("Not adding: ", data.URL)
-		return nil
+		return 0, nil
 	}
 
 	db := storageManager.db
@@ -69,7 +68,7 @@ func (storageManager StorageManager) InsertMetaDataIntoDB(data *PagesMetaData) e
 	(url, title, content, description, keywords, heading, hash, modified_time, language, content_length)
 	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 
-	_, err := db.Exec(insertSQL,
+	result, err := db.Exec(insertSQL,
 		data.URL,
 		data.Title,
 		data.Content,
@@ -82,18 +81,30 @@ func (storageManager StorageManager) InsertMetaDataIntoDB(data *PagesMetaData) e
 		data.ContentLength,
 	)
 
-	return err
+	if (err != nil) {
+		utils.ErrorLogger.Println(err)
+		return 0, err
+	}
+
+	lastIndex, err := result.LastInsertId()
+
+	if (err != nil) {
+		utils.ErrorLogger.Println(err)
+		return 0, err
+	}
+
+	return uint64(lastIndex), err
 }
 
 func (storageManager StorageManager) PrintLastFiveRows() {
 
 	err := os.MkdirAll("./debug", 0755)
 	if err != nil {
-		log.Fatal(err)
+		utils.ErrorLogger.Fatal(err)
 	}
 	file, err := os.OpenFile("./debug/database.txt", os.O_CREATE|os.O_WRONLY, 0666)
 	if err != nil {
-		log.Fatal(err)
+		utils.ErrorLogger.Fatal(err)
 	}
 	defer file.Close()
 
