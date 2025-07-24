@@ -21,7 +21,7 @@ func SetUpDataBase(driver string) (*StorageManager, error) {
 		return nil, err
 	}
 
-	db, err := sql.Open(driver, "./database/test.db")
+	db, err := sql.Open(driver, "./database/crawler.db")
 
 	if err != nil {
 		utils.Error(err)
