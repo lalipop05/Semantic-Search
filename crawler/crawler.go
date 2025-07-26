@@ -7,7 +7,6 @@ import (
 	"mySearchEngine/utils"
 
 	"github.com/gocolly/colly/v2"
-	_ "github.com/mattn/go-sqlite3"
 )
 
 const MAXDEPTH = 1

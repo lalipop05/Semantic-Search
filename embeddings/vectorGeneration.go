@@ -5,15 +5,15 @@ import (
 
 	ort "github.com/yalue/onnxruntime_go"
 )
-const MODEL_SEQUENCE_LEN = 384
+
+const MODEL_SEQUENCE_LEN = 512
 const MODEL_OUTPUT_VECTOR_LEN = 384
 
 var MODEL_INPUT_NAMES = []string{"input_ids", "attention_mask", "token_type_ids"}
 var MODEL_OUTPUT_NAMES = []string{"last_hidden_state"}
 
-
 func populateTensor(tensor *ort.Tensor[int64], values []int) {
-	if (len(values) != int(tensor.GetShape()[1])) {
+	if len(values) != int(tensor.GetShape()[1]) {
 		utils.WarningLogger.Println("Tensor shape and values shape does not match up!")
 		return
 	}
@@ -25,7 +25,7 @@ func populateTensor(tensor *ort.Tensor[int64], values []int) {
 
 func (es *EmbeddingService) ProduceEmbeddings(tokenizedPages []*TokenizedPage) ([]*EmbeddedPage, error) {
 	inputShape := ort.NewShape(1, MODEL_SEQUENCE_LEN)
-	
+
 	inputTensor, err := ort.NewEmptyTensor[int64](inputShape)
 	if err != nil {
 		utils.ErrorLogger.Fatalf("Failed to create input tensor: %v", err)
@@ -54,7 +54,7 @@ func (es *EmbeddingService) ProduceEmbeddings(tokenizedPages []*TokenizedPage) (
 		return nil, err
 	}
 	defer outputTensor.Destroy()
-	
+
 	embeddedPages := make([]*EmbeddedPage, 0, len(tokenizedPages))
 
 	session, err := ort.NewAdvancedSession(MODELPATH+MODEL_FILENAME,
@@ -74,15 +74,15 @@ func (es *EmbeddingService) ProduceEmbeddings(tokenizedPages []*TokenizedPage) (
 			populateTensor(attentionTensor, tokens.AttentionMask)
 
 			err = session.Run()
-			if (err != nil) {
-				return nil, utils.Error(err)
+			if err != nil {
+				utils.ErrorLogger.Println(err)
+				return nil, err
 			}
 
 			outputData := outputTensor.GetData()
 			pageEmbeddings = append(pageEmbeddings, outputData[:MODEL_OUTPUT_VECTOR_LEN])
 		}
 		embeddedPage := EmbeddedPage{
-			Idx: tokenizedPage.Idx,
 			Embeddings: pageEmbeddings,
 		}
 		embeddedPages = append(embeddedPages, &embeddedPage)

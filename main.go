@@ -8,6 +8,8 @@ import (
 	"mySearchEngine/embeddings"
 	"mySearchEngine/storage"
 	"mySearchEngine/utils"
+
+	_ "github.com/tursodatabase/libsql-client-go/libsql"
 )
 
 const DBDRIVER string = "sqlite3"
@@ -34,24 +36,28 @@ func main() {
 	defer storageManager.Close()
 
 	embeddingService, err := embeddings.NewEmbeddingService()
-	if (err != nil) {
-		panic(utils.Error(err))
+	if err != nil {
+		utils.ErrorLogger.Println(err)
+		panic(err)
 	}
-	
-
-	
 
 	for value := range ch {
-		idx, err := storageManager.InsertMetaDataIntoDB(&value)
-		if (err != nil) {
-			panic(utils.Error(err))
+		dbEntry, err := embeddingService.GenerateBatchEmbeddings([]*storage.PagesMetaData{&value})
+		if err != nil {
+			utils.ErrorLogger.Println(err)
+			panic(err)
 		}
-		embeddedPages, err := embeddingService.GenerateBatchEmbeddings([]uint64{idx}, []*storage.PagesMetaData{&value})
-		if (err != nil) {
-			panic(utils.Error(err))
+		inserted, err := storageManager.InsertEntriesIntoDB(dbEntry)
+
+		if err != nil {
+			utils.ErrorLogger.Println(err)
+			panic(err)
 		}
-		fmt.Println(embeddedPages)
-		
+		if inserted != 1 {
+			utils.CrawlLogger.Println(dbEntry[0].MetaData.URL)
+			panic("Not inserted")
+		}
+
 	}
 
 	end := time.Now()

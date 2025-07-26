@@ -15,29 +15,27 @@ const MODEL_FILENAME = "model_optimized.onnx"
 
 const ONNX_RUNTIME_PATH = "C:/College_UTD/Summer_2024/onnxruntime-win-x64-1.22.1/lib/onnxruntime.dll"
 
-
 type EmbeddingService struct {
 	tokenizer *tokenizer.Tokenizer
 }
 
 func NewEmbeddingService() (*EmbeddingService, error) {
-	tk, err := pretrained.FromFile(MODELPATH+TOKENIZER_FILE_NAME)
-	if (err != nil) {
+	tk, err := pretrained.FromFile(MODELPATH + TOKENIZER_FILE_NAME)
+	if err != nil {
 		utils.ErrorLogger.Println(err)
 		return nil, err
 	}
 
 	paddingParams := getPaddingParams()
-    tk.WithPadding(paddingParams)
+	tk.WithPadding(paddingParams)
 
 	ort.SetSharedLibraryPath(ONNX_RUNTIME_PATH)
 
 	err = ort.InitializeEnvironment()
 	if err != nil {
-		utils.Error(err)
+		utils.ErrorLogger.Println(err)
 		return nil, err
 	}
-
 
 	return &EmbeddingService{
 		tokenizer: tk,
@@ -46,10 +44,10 @@ func NewEmbeddingService() (*EmbeddingService, error) {
 
 func getPaddingParams() *tokenizer.PaddingParams {
 	paddingStrat := tokenizer.NewPaddingStrategy(tokenizer.WithFixed(MODEL_SEQUENCE_LEN))
-    paddingParams := tokenizer.PaddingParams {
-        Strategy: *paddingStrat,
-        Direction: tokenizer.Right,
-    }
+	paddingParams := tokenizer.PaddingParams{
+		Strategy:  *paddingStrat,
+		Direction: tokenizer.Right,
+	}
 	return &paddingParams
 }
 
@@ -57,28 +55,41 @@ func (es *EmbeddingService) Destroy() {
 	defer ort.DestroyEnvironment()
 }
 
-func (es *EmbeddingService) GenerateBatchEmbeddings(idx []uint64, data []*storage.PagesMetaData) ([]*EmbeddedPage, error) {
-	tokenizedPages, err := es.GetBatchTokens(idx, data)
-	if (err != nil) {
-		utils.Error(err)
+func (es *EmbeddingService) GenerateBatchEmbeddings(data []*storage.PagesMetaData) ([]*storage.PagesDBEntry, error) {
+	tokenizedPages, err := es.GetBatchTokens(data)
+	if err != nil {
+		utils.ErrorLogger.Println(err)
 		return nil, err
 	}
 	embeddedPages, err := es.ProduceEmbeddings(tokenizedPages)
-	if (err != nil) {
-		utils.Error(err)
+	if err != nil {
+		utils.ErrorLogger.Println(err)
 		return nil, err
 	}
-	return embeddedPages, nil
+
+	dbEntries := make([]*storage.PagesDBEntry, 0, len(data))
+	for i := range data {
+		dbEntry := storage.PagesDBEntry{
+			MetaData:   data[i],
+			Embeddings: embeddedPages[i].getPointersToEmbeddings(),
+		}
+		dbEntries = append(dbEntries, &dbEntry)
+	}
+	return dbEntries, nil
 }
 
-
 type TokenizedPage struct {
-	Idx uint64
 	Tokens []*tokenizer.Encoding
 }
 
 type EmbeddedPage struct {
-	Idx uint64
 	Embeddings [][]float32
 }
 
+func (eb *EmbeddedPage) getPointersToEmbeddings() []*[]float32 {
+	res := make([]*[]float32, 0, len(eb.Embeddings))
+	for i := range eb.Embeddings {
+		res = append(res, &eb.Embeddings[i])
+	}
+	return res
+}

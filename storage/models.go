@@ -17,6 +17,12 @@ type PagesMetaData struct {
 	ContentLength   int64
 }
 
+type PagesDBEntry struct {
+	MetaData *PagesMetaData
+	Embeddings []*[]float32
+}
+
+
 type InMemoryMetaData struct {
 	DataBaseID   int32
 	CrawledTime  time.Time

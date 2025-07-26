@@ -10,8 +10,8 @@ import (
 
 const TOKENIZER_STRIDE_LEN = 64
 
-func (es *EmbeddingService) GetBatchTokens(idx []uint64, data []*storage.PagesMetaData) ([]*TokenizedPage, error) {
-	n := len(idx)
+func (es *EmbeddingService) GetBatchTokens(data []*storage.PagesMetaData) ([]*TokenizedPage, error) {
+	n := len(data)
 	if (n == 0) {
 		return nil, nil
 	}
@@ -23,10 +23,10 @@ func (es *EmbeddingService) GetBatchTokens(idx []uint64, data []*storage.PagesMe
 
 	tokenizedPages := make([]*TokenizedPage, 0, n)
 
-	for i, enc := range batchEncodings {
+	for _, enc := range batchEncodings {
 		processed := es.ProcessEncoding(enc)
 		if (processed != nil) {
-			tokenizedPages = append(tokenizedPages, &TokenizedPage{idx[i], processed})
+			tokenizedPages = append(tokenizedPages, &TokenizedPage{processed})
 		}
 	}
 	return tokenizedPages, nil
