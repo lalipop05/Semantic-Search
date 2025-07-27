@@ -17,6 +17,7 @@ require (
 	github.com/antchfx/xmlquery v1.4.4 // indirect
 	github.com/antchfx/xpath v1.3.4 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.0 // indirect
+	github.com/asg017/sqlite-vec-go-bindings v0.1.6 // indirect
 	github.com/bits-and-blooms/bitset v1.22.0 // indirect
 	github.com/coder/websocket v1.8.12 // indirect
 	github.com/emirpasic/gods v1.18.1 // indirect

@@ -61,10 +61,24 @@ func (es *EmbeddingService) GenerateBatchEmbeddings(data []*storage.PagesMetaDat
 		utils.ErrorLogger.Println(err)
 		return nil, err
 	}
+
+	for _, tokenizedPage := range tokenizedPages {
+		for _, embedding := range tokenizedPage.Tokens {
+			utils.CrawlLogger.Println("tokenized len/input len: ", embedding.Len())
+		}
+	}
+
 	embeddedPages, err := es.ProduceEmbeddings(tokenizedPages)
 	if err != nil {
 		utils.ErrorLogger.Println(err)
 		return nil, err
+	}
+	for _, embeddedPage := range embeddedPages {
+		utils.CrawlLogger.Println(len(embeddedPage.Embeddings))
+		for _, embedding := range embeddedPage.Embeddings {
+			utils.CrawlLogger.Println("Embedded len/output len: ", len(embedding))
+		}
+		
 	}
 
 	dbEntries := make([]*storage.PagesDBEntry, 0, len(data))
