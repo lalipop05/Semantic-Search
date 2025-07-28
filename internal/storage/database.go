@@ -4,16 +4,18 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"mySearchEngine/utils"
+	"mySearchEngine/internal/utils"
 	"os"
 	"strconv"
-	"strings"
 
-	_ "github.com/mattn/go-sqlite3"
 	sqlite_vec "github.com/asg017/sqlite-vec-go-bindings/cgo"
+	_ "github.com/mattn/go-sqlite3"
 )
 
 const VEC_DIM = 384
+
+const DATABASE_DIR_PATH = "./../database"
+const DATABASE_NAME = "tester.db"
 
 type StorageManager struct {
 	db    *sql.DB
@@ -22,13 +24,13 @@ type StorageManager struct {
 
 func SetUpDataBase(driver string) (*StorageManager, error) {
 	sqlite_vec.Auto()
-	err := os.MkdirAll("./database", 0755)
+	err := os.MkdirAll(DATABASE_DIR_PATH, 0755)
 	if err != nil {
 		utils.ErrorLogger.Println(err)
 		return nil, err
 	}
 
-	db, err := sql.Open("sqlite3", "./database/tester.db")
+	db, err := sql.Open("sqlite3", DATABASE_DIR_PATH+"/"+DATABASE_NAME)
 	if err != nil {
 		utils.ErrorLogger.Fatal(err)
 	}
@@ -38,14 +40,14 @@ func SetUpDataBase(driver string) (*StorageManager, error) {
 	if err != nil {
 		utils.ErrorLogger.Fatal(err)
 	}
-	utils.CrawlLogger.Printf("vec_version=%s\n",vecVersion)
+	utils.InfoLogger.Printf("vec_version=%s\n", vecVersion)
 
 	_, err = db.Exec("PRAGMA foreign_keys = ON;")
 	if err != nil {
 		utils.ErrorLogger.Println(err)
 		return nil, fmt.Errorf("failed to enable foreign keys: %w", err)
 	}
-	
+
 	pagesMetaDataSQL := `CREATE TABLE IF NOT EXISTS pages_meta_data (
 	id INTEGER PRIMARY KEY AUTOINCREMENT,
 	url TEXT UNIQUE NOT NULL,
@@ -65,7 +67,7 @@ func SetUpDataBase(driver string) (*StorageManager, error) {
 		utils.ErrorLogger.Println(err)
 		return nil, err
 	}
-	
+
 	vectorTableSQL := `CREATE TABLE IF NOT EXISTS page_vectors (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		page_id INTEGER NOT NULL,
@@ -85,7 +87,7 @@ func SetUpDataBase(driver string) (*StorageManager, error) {
 		utils.ErrorLogger.Println(err)
 		return nil, err
 	}
-	
+
 	cache := make(CrawledPagesCache)
 
 	storageManager := StorageManager{db, &cache}
@@ -93,7 +95,7 @@ func SetUpDataBase(driver string) (*StorageManager, error) {
 	return &storageManager, nil
 }
 
-func (storageManager StorageManager) InsertEntriesIntoDB(dbEntries []*PagesDBEntry) (error) {
+func (storageManager StorageManager) InsertEntriesIntoDB(dbEntries []*PagesDBEntry) error {
 	db := storageManager.db
 
 	transaction, err := db.Begin()
@@ -197,6 +199,80 @@ func (storageManager StorageManager) InsertEntriesIntoDB(dbEntries []*PagesDBEnt
 		return err
 	}
 	return nil
+}
+
+func (storageManager StorageManager) QueryDatabase(query []float32) ([]*DistanceMetric, error) {
+	rows, err := storageManager.getVectorRowIds(query)
+	if (err != nil) {
+		utils.ErrorLogger.Println(err)
+		return nil, err
+	}
+
+	rows, err = storageManager.getAssociatedLinks(rows)
+	if (err != nil) {
+		utils.ErrorLogger.Println(err)
+		return nil, err
+	}
+	return rows, nil
+
+}
+
+func (storageManager StorageManager) getAssociatedLinks(knn []*DistanceMetric) ([]*DistanceMetric, error){
+	for _, neighbour := range knn {
+		row, err := storageManager.db.Query(`SELECT page_id FROM page_vectors WHERE id = ?`, neighbour.Rowid)
+		if (err != nil) {
+			utils.ErrorLogger.Println(err)
+			return nil, err
+		}
+		
+		var pageId int64
+		row.Scan(&pageId)
+
+		row, err = storageManager.db.Query(`SELECT url FROM pages_meta_data WHERE id = ?`, pageId)
+		if (err != nil) {
+			utils.ErrorLogger.Println(err)
+			return nil, err
+		}
+		var url string
+		row.Scan(&url)
+		neighbour.URL = url
+	} 
+	return knn, nil
+}
+
+func (storageManager StorageManager) getVectorRowIds(query []float32) ([]*DistanceMetric, error) {
+	serializedQuery, err := sqlite_vec.SerializeFloat32(query)
+	if err != nil {
+		utils.ErrorLogger.Panicln(err)
+		return nil, err
+	}
+
+	rows, err := storageManager.db.Query(`SELECT rowid, distance 
+	FROM page_vectors_idx
+	WHERE embedding MATCH ?
+	ORDER BY distance
+	LIMIT 5
+	`, serializedQuery)
+
+	if err != nil {
+		utils.ErrorLogger.Println(err)
+		return nil, err
+	}
+
+	knn := make([]*DistanceMetric, 0, 5)
+
+	for rows.Next() {
+		var rowid int64
+		var distance float64
+		err := rows.Scan(&rowid, &distance)
+		if err != nil {
+			utils.ErrorLogger.Println(err)
+			return nil, err
+		}
+		knn = append(knn, &DistanceMetric{rowid, distance, ""})
+	}
+
+	return knn, nil
 }
 
 func (storageManager *StorageManager) Close() {

@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"time"
 
-	"mySearchEngine/crawler"
-	"mySearchEngine/embeddings"
-	"mySearchEngine/storage"
-	"mySearchEngine/utils"
+	"mySearchEngine/internal/crawler"
+	"mySearchEngine/internal/embeddings"
+	"mySearchEngine/internal/storage"
+	"mySearchEngine/internal/utils"
 )
 
 const DBDRIVER string = "sqlite3"
@@ -41,7 +41,6 @@ func main() {
 	defer embeddingService.Destroy()
 	
 	for value := range ch {
-		fmt.Println(value.URL)
 		dbEntry, err := embeddingService.GenerateBatchEmbeddings([]*storage.PagesMetaData{&value})
 		if err != nil {
 			utils.ErrorLogger.Println(err)

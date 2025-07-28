@@ -1,8 +1,8 @@
 package embeddings
 
 import (
-	"mySearchEngine/storage"
-	"mySearchEngine/utils"
+	"mySearchEngine/internal/storage"
+	"mySearchEngine/internal/utils"
 	"strings"
 
 	"github.com/sugarme/tokenizer"
@@ -66,6 +66,18 @@ func (es *EmbeddingService) ProcessEncoding(encoding tokenizer.Encoding) []*toke
 
 		return append(splitEncodings, &temp)
 	}
+}
+
+func (es *EmbeddingService) GetQueryTokens(query string) ([]*tokenizer.Encoding, error) {
+	inputSequence := tokenizer.NewInputSequence(query)
+	encodingInput := tokenizer.NewSingleEncodeInput(inputSequence)
+	encoding, err := es.tokenizer.Encode(encodingInput, true)
+	if (err != nil) {
+		utils.ErrorLogger.Println(err)
+		return nil, err
+	}
+	processedEncoding := es.ProcessEncoding(*encoding)
+	return processedEncoding, nil
 }
 
 

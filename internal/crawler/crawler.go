@@ -3,8 +3,8 @@ package crawler
 import (
 	"fmt"
 
-	"mySearchEngine/storage"
-	"mySearchEngine/utils"
+	"mySearchEngine/internal/storage"
+	"mySearchEngine/internal/utils"
 
 	"github.com/gocolly/colly/v2"
 )

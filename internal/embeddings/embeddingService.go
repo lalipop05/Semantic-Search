@@ -1,8 +1,9 @@
 package embeddings
 
 import (
-	"mySearchEngine/storage"
-	"mySearchEngine/utils"
+	"fmt"
+	"mySearchEngine/internal/storage"
+	"mySearchEngine/internal/utils"
 
 	"github.com/sugarme/tokenizer"
 	"github.com/sugarme/tokenizer/pretrained"
@@ -55,6 +56,7 @@ func (es *EmbeddingService) Destroy() {
 	defer ort.DestroyEnvironment()
 }
 
+
 func (es *EmbeddingService) GenerateBatchEmbeddings(data []*storage.PagesMetaData) ([]*storage.PagesDBEntry, error) {
 	tokenizedPages, err := es.GetBatchTokens(data)
 	if err != nil {
@@ -62,23 +64,10 @@ func (es *EmbeddingService) GenerateBatchEmbeddings(data []*storage.PagesMetaDat
 		return nil, err
 	}
 
-	for _, tokenizedPage := range tokenizedPages {
-		for _, embedding := range tokenizedPage.Tokens {
-			utils.CrawlLogger.Println("tokenized len/input len: ", embedding.Len())
-		}
-	}
-
 	embeddedPages, err := es.ProduceEmbeddings(tokenizedPages)
 	if err != nil {
 		utils.ErrorLogger.Println(err)
 		return nil, err
-	}
-	for _, embeddedPage := range embeddedPages {
-		utils.CrawlLogger.Println(len(embeddedPage.Embeddings))
-		for _, embedding := range embeddedPage.Embeddings {
-			utils.CrawlLogger.Println("Embedded len/output len: ", len(embedding))
-		}
-		
 	}
 
 	dbEntries := make([]*storage.PagesDBEntry, 0, len(data))
@@ -90,6 +79,29 @@ func (es *EmbeddingService) GenerateBatchEmbeddings(data []*storage.PagesMetaDat
 		dbEntries = append(dbEntries, &dbEntry)
 	}
 	return dbEntries, nil
+}
+
+func (es *EmbeddingService) GenerateQueryEmbedding(query string) ([][]float32, error) {
+	if query == "" {
+		return nil, fmt.Errorf("empty string")
+	}
+
+	tokens, err := es.GetQueryTokens(query)
+	if err != nil {
+		utils.ErrorLogger.Println(err)
+		return nil, err
+	}
+	if len(tokens) > 1 {
+		return nil, fmt.Errorf("input too long")
+	}
+
+	embeddings, err := es.ProduceQueryEmbeddings(tokens)
+	if err != nil {
+		utils.ErrorLogger.Println(err)
+		return nil, err
+	}
+	
+	return embeddings, nil
 }
 
 type TokenizedPage struct {

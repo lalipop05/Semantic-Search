@@ -18,15 +18,20 @@ type PagesMetaData struct {
 }
 
 type PagesDBEntry struct {
-	MetaData *PagesMetaData
+	MetaData   *PagesMetaData
 	Embeddings []*[]float32
 }
 
-
 type InMemoryMetaData struct {
-	DataBaseID   int32
-	CrawledTime  time.Time
-	ContentHash  string
+	DataBaseID  int32
+	CrawledTime time.Time
+	ContentHash string
+}
+
+type DistanceMetric struct {
+	Rowid    int64
+	Distance float64
+	URL      string
 }
 
 type CrawledPagesCache map[string]InMemoryMetaData
@@ -34,11 +39,11 @@ type CrawledPagesCache map[string]InMemoryMetaData
 func (cache CrawledPagesCache) Exists(data *PagesMetaData) bool {
 	metaData, exists := cache[data.URL]
 
-	if (!exists) {
+	if !exists {
 		return false
 	}
 
-	if (data.Hash == metaData.ContentHash) {
+	if data.Hash == metaData.ContentHash {
 		return true
 	} else {
 		return false
