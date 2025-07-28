@@ -70,6 +70,7 @@ func (es *EmbeddingService) GenerateBatchEmbeddings(data []*storage.PagesMetaDat
 		return nil, err
 	}
 
+
 	dbEntries := make([]*storage.PagesDBEntry, 0, len(data))
 	for i := range data {
 		dbEntry := storage.PagesDBEntry{

@@ -1,10 +1,12 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"mySearchEngine/internal/embeddings"
 	"mySearchEngine/internal/storage"
 	"mySearchEngine/internal/utils"
+	"os"
 )
 
 const DBDRIVER = "sqlite3"
@@ -28,9 +30,20 @@ func main() {
 	defer embeddingService.Destroy()
 
 	var input string = ""
+	scanner := bufio.NewScanner(os.Stdin)
+
 	for {
 		fmt.Println("What do you want to search for: ")
-		fmt.Scan(&input)
+		
+		if !scanner.Scan() {
+			break
+		}
+
+		input = scanner.Text()
+
+		if (input == "") {
+			break
+		}
 		
 		singleEmbedding, err := embeddingService.GenerateQueryEmbedding(input)
 
@@ -43,7 +56,7 @@ func main() {
 				panic(err)
 			}
 		}
-		fmt.Println(len(singleEmbedding[0]))
+		
 		pages, err := storageManager.QueryDatabase(singleEmbedding[0])
 		if (err != nil) {
 			utils.ErrorLogger.Println(err)
@@ -53,6 +66,7 @@ func main() {
 		for _, d := range pages {
 			fmt.Println("URL: ", d.URL)
 			fmt.Println("Distance: ", d.Distance)
+			fmt.Println("Rowid: ", d.Rowid)
 		}		
 	}
 }

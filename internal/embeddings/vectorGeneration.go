@@ -61,6 +61,7 @@ func (es *EmbeddingService) ProduceQueryEmbeddings(tokens []*tokenizer.Encoding)
 	inputShape := ort.NewShape(1, MODEL_SEQUENCE_LEN)
 
 	inputTensor, attentionTensor, tokenTypeIdTensor, err := getInputTensors(inputShape)
+
 	if (err != nil) {
 		utils.ErrorLogger.Println(err)
 		return nil, err
@@ -80,7 +81,7 @@ func (es *EmbeddingService) ProduceQueryEmbeddings(tokens []*tokenizer.Encoding)
 
 	session, err := ort.NewAdvancedSession(MODELPATH+MODEL_FILENAME,
 		MODEL_INPUT_NAMES, MODEL_OUTPUT_NAMES,
-		[]ort.Value{inputTensor, attentionTensor, tokenTypeIdTensor}, []ort.Value{outputTensor}, nil)
+		[]ort.ArbitraryTensor{inputTensor, attentionTensor, tokenTypeIdTensor}, []ort.ArbitraryTensor{outputTensor}, nil)
 	if err != nil {
 		utils.ErrorLogger.Fatalf("Failed to create inference session: %v", err)
 		return nil, err
@@ -97,7 +98,10 @@ func (es *EmbeddingService) ProduceQueryEmbeddings(tokens []*tokenizer.Encoding)
 			return nil, err
 		}
 		outputData := outputTensor.GetData()
-		response = append(response, outputData[:MODEL_OUTPUT_VECTOR_LEN])
+
+		temp := make([]float32, MODEL_OUTPUT_VECTOR_LEN)
+		copy(temp, outputData[:MODEL_OUTPUT_VECTOR_LEN])
+		response = append(response, temp)
 	}
 	return response, nil
 }
@@ -148,7 +152,9 @@ func (es *EmbeddingService) ProduceEmbeddings(tokenizedPages []*TokenizedPage) (
 			}
 
 			outputData := outputTensor.GetData()
-			pageEmbeddings = append(pageEmbeddings, outputData[:MODEL_OUTPUT_VECTOR_LEN])
+			temp := make([]float32, MODEL_OUTPUT_VECTOR_LEN)
+			copy(temp, outputData)
+			pageEmbeddings = append(pageEmbeddings, temp)
 		}
 		embeddedPage := EmbeddedPage{
 			Embeddings: pageEmbeddings,

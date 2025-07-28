@@ -49,7 +49,11 @@ func onATagCallBack() func(e *colly.HTMLElement) {
 }
 
 func initCrawler(maxDepth int, parallelism int) *colly.Collector {
-	c := colly.NewCollector(colly.MaxDepth(maxDepth), colly.Async(true))
+	c := colly.NewCollector(
+		colly.MaxDepth(maxDepth), 
+		colly.Async(true),
+		colly.AllowedDomains("www.geeksforgeeks.org"),
+	)
 
 	c.Limit(&colly.LimitRule{
 		DomainGlob:  "*",

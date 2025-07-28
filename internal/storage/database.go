@@ -202,77 +202,55 @@ func (storageManager StorageManager) InsertEntriesIntoDB(dbEntries []*PagesDBEnt
 }
 
 func (storageManager StorageManager) QueryDatabase(query []float32) ([]*DistanceMetric, error) {
-	rows, err := storageManager.getVectorRowIds(query)
-	if (err != nil) {
-		utils.ErrorLogger.Println(err)
-		return nil, err
-	}
+    serializedQuery, err := sqlite_vec.SerializeFloat32(query)
+    if err != nil {
+        utils.ErrorLogger.Printf("Failed to serialize query vector: %v", err)
+        return nil, fmt.Errorf("failed to serialize query: %w", err)
+    }
 
-	rows, err = storageManager.getAssociatedLinks(rows)
-	if (err != nil) {
-		utils.ErrorLogger.Println(err)
-		return nil, err
-	}
-	return rows, nil
+    sqlQuery := `
+        SELECT
+            idx.rowid,
+            idx.distance,
+            meta.url
+        FROM
+            page_vectors_idx AS idx
+        JOIN
+            page_vectors AS vec ON idx.rowid = vec.id
+        JOIN
+            pages_meta_data AS meta ON vec.page_id = meta.id
+        WHERE
+            idx.embedding MATCH ? AND k = 5
+        ORDER BY
+            idx.distance
+    `
 
-}
+    rows, err := storageManager.db.Query(sqlQuery, serializedQuery)
+    if err != nil {
+        utils.ErrorLogger.Printf("Failed to execute vector search query: %v", err)
+        return nil, err
+    }
+    defer rows.Close() 
 
-func (storageManager StorageManager) getAssociatedLinks(knn []*DistanceMetric) ([]*DistanceMetric, error){
-	for _, neighbour := range knn {
-		row, err := storageManager.db.Query(`SELECT page_id FROM page_vectors WHERE id = ?`, neighbour.Rowid)
-		if (err != nil) {
-			utils.ErrorLogger.Println(err)
-			return nil, err
-		}
-		
-		var pageId int64
-		row.Scan(&pageId)
+    var results []*DistanceMetric
 
-		row, err = storageManager.db.Query(`SELECT url FROM pages_meta_data WHERE id = ?`, pageId)
-		if (err != nil) {
-			utils.ErrorLogger.Println(err)
-			return nil, err
-		}
-		var url string
-		row.Scan(&url)
-		neighbour.URL = url
-	} 
-	return knn, nil
-}
+    for rows.Next() {
+        metric := &DistanceMetric{}
+        err := rows.Scan(&metric.Rowid, &metric.Distance, &metric.URL)
+        if err != nil {
+            utils.ErrorLogger.Printf("Failed to scan search result row: %v", err)
+            return nil, err
+        }
+        results = append(results, metric)
+    }
 
-func (storageManager StorageManager) getVectorRowIds(query []float32) ([]*DistanceMetric, error) {
-	serializedQuery, err := sqlite_vec.SerializeFloat32(query)
-	if err != nil {
-		utils.ErrorLogger.Panicln(err)
-		return nil, err
-	}
+    // Check for any error that occurred during iteration
+    if err = rows.Err(); err != nil {
+        utils.ErrorLogger.Printf("Error during result set iteration: %v", err)
+        return nil, err
+    }
 
-	rows, err := storageManager.db.Query(`SELECT rowid, distance 
-	FROM page_vectors_idx
-	WHERE embedding MATCH ?
-	ORDER BY distance
-	LIMIT 5
-	`, serializedQuery)
-
-	if err != nil {
-		utils.ErrorLogger.Println(err)
-		return nil, err
-	}
-
-	knn := make([]*DistanceMetric, 0, 5)
-
-	for rows.Next() {
-		var rowid int64
-		var distance float64
-		err := rows.Scan(&rowid, &distance)
-		if err != nil {
-			utils.ErrorLogger.Println(err)
-			return nil, err
-		}
-		knn = append(knn, &DistanceMetric{rowid, distance, ""})
-	}
-
-	return knn, nil
+    return results, nil
 }
 
 func (storageManager *StorageManager) Close() {
