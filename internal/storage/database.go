@@ -106,8 +106,8 @@ func (storageManager StorageManager) InsertEntriesIntoDB(dbEntries []*PagesDBEnt
 	defer transaction.Rollback()
 
 	insertMetaDataSQL := `INSERT OR REPLACE INTO pages_meta_data
-	(url, title, content, description, keywords, heading, hash, modified_time, language, content_length)
-	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`
+	(url, title, description, keywords, heading, hash, modified_time, language, content_length)
+	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`
 
 	insertVectorMetaDataSQL := `INSERT INTO page_vectors (page_id, vector_type) VALUES (?, ?)`
 
@@ -152,7 +152,6 @@ func (storageManager StorageManager) InsertEntriesIntoDB(dbEntries []*PagesDBEnt
 		err = pageMetaDataStmt.QueryRow(
 			metaData.URL,
 			metaData.Title,
-			metaData.Content,
 			metaData.MetaDescription,
 			metaData.MetaKeyWords,
 			string(headingsJSON),
@@ -220,7 +219,7 @@ func (storageManager StorageManager) QueryDatabase(query []float32) ([]*Distance
         JOIN
             pages_meta_data AS meta ON vec.page_id = meta.id
         WHERE
-            idx.embedding MATCH ? AND k = 5
+            idx.embedding MATCH ? AND k = 30
         ORDER BY
             idx.distance
     `

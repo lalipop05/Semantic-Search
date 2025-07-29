@@ -9,10 +9,11 @@ import (
 	"github.com/gocolly/colly/v2"
 )
 
-const MAXDEPTH = 1
+const MAXDEPTH = 4
 const PARALLELISM = 4
+var Count = 0
 func Crawl(url string, ch *chan storage.PagesMetaData) {
-
+	
 	c := initCrawler(MAXDEPTH, PARALLELISM)
 
 	c.OnHTML("a[href]", onATagCallBack())
@@ -70,6 +71,10 @@ func onRequestCallBack() func(*colly.Request) {
 			s += "  "
 		}
 		s += fmt.Sprintf("%d - Visiting %v", r.Depth, r.URL.String())
-		utils.CrawlLogger.Println(s)
+		utils.InfoLogger.Println(s)
+		Count++
+		if (Count%1000 == 0) {
+			fmt.Println("Webpages crawled: ", Count)
+		}
 	}
 }
