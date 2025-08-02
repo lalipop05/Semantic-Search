@@ -18,6 +18,7 @@ const ONNX_RUNTIME_PATH = "C:/College_UTD/Summer_2024/onnxruntime-win-x64-1.22.1
 
 type EmbeddingService struct {
 	tokenizer *tokenizer.Tokenizer
+	ortObj    *OrtObject
 }
 
 func NewEmbeddingService() (*EmbeddingService, error) {
@@ -30,16 +31,14 @@ func NewEmbeddingService() (*EmbeddingService, error) {
 	paddingParams := getPaddingParams()
 	tk.WithPadding(paddingParams)
 
-	ort.SetSharedLibraryPath(ONNX_RUNTIME_PATH)
+	inputShape := ort.NewShape(1, MODEL_SEQUENCE_LEN)
+	outputShape := ort.NewShape(1, MODEL_SEQUENCE_LEN, MODEL_OUTPUT_VECTOR_LEN)
 
-	err = ort.InitializeEnvironment()
-	if err != nil {
-		utils.ErrorLogger.Println(err)
-		return nil, err
-	}
+	ortObj := NewOrtObject(&inputShape, &outputShape)
 
 	return &EmbeddingService{
 		tokenizer: tk,
+		ortObj: ortObj,
 	}, err
 }
 
@@ -53,9 +52,8 @@ func getPaddingParams() *tokenizer.PaddingParams {
 }
 
 func (es *EmbeddingService) Destroy() {
-	defer ort.DestroyEnvironment()
+	es.ortObj.Destroy()
 }
-
 
 func (es *EmbeddingService) GenerateBatchEmbeddings(data []*storage.PagesMetaData) ([]*storage.PagesDBEntry, error) {
 	tokenizedPages, err := es.GetBatchTokens(data)
@@ -69,7 +67,6 @@ func (es *EmbeddingService) GenerateBatchEmbeddings(data []*storage.PagesMetaDat
 		utils.ErrorLogger.Println(err)
 		return nil, err
 	}
-
 
 	dbEntries := make([]*storage.PagesDBEntry, 0, len(data))
 	for i := range data {
@@ -101,7 +98,7 @@ func (es *EmbeddingService) GenerateQueryEmbedding(query string) ([][]float32, e
 		utils.ErrorLogger.Println(err)
 		return nil, err
 	}
-	
+
 	return embeddings, nil
 }
 
@@ -119,4 +116,87 @@ func (eb *EmbeddedPage) getPointersToEmbeddings() []*[]float32 {
 		res = append(res, &eb.Embeddings[i])
 	}
 	return res
+}
+
+type OrtObject struct {
+	InputTensor       *ort.Tensor[int64]
+	AttentionTensor   *ort.Tensor[int64]
+	TokenTypeIdTensor *ort.Tensor[int64]
+	OutputTensor      *ort.Tensor[float32]
+	Session           *ort.AdvancedSession
+}
+
+func NewOrtObject(inputShape *ort.Shape, outputShape *ort.Shape) *OrtObject {
+
+	ort.SetSharedLibraryPath(ONNX_RUNTIME_PATH)
+
+	err := ort.InitializeEnvironment()
+	if err != nil {
+		utils.ErrorLogger.Fatal(err)
+	}
+
+	inTensor, attTensor, tokenTypeTensor, err := getInputTensors(*inputShape)
+	if err != nil {
+		utils.ErrorLogger.Fatal(err)
+	}
+
+	outTensor, err := getOutputTensor(*outputShape)
+	if err != nil {
+		utils.ErrorLogger.Fatal(err)
+	}
+
+	session, err := ort.NewAdvancedSession(MODELPATH+MODEL_FILENAME,
+		MODEL_INPUT_NAMES, MODEL_OUTPUT_NAMES,
+		[]ort.ArbitraryTensor{inTensor, attTensor, tokenTypeTensor}, []ort.ArbitraryTensor{outTensor}, nil)
+	if err != nil {
+		utils.ErrorLogger.Fatalf("Failed to create inference session: %v", err)
+	}
+
+	return &OrtObject{
+		inTensor,
+		attTensor,
+		tokenTypeTensor,
+		outTensor,
+		session,
+	}
+}
+
+func (ortObj *OrtObject) Destroy() {
+	ortObj.InputTensor.Destroy()
+	ortObj.AttentionTensor.Destroy()
+	ortObj.TokenTypeIdTensor.Destroy()
+	ortObj.OutputTensor.Destroy()
+	ortObj.Session.Destroy()
+	ort.DestroyEnvironment()
+}
+
+func getInputTensors(shape ort.Shape) (*ort.Tensor[int64], *ort.Tensor[int64], *ort.Tensor[int64], error) {
+	inputTensor, err := ort.NewEmptyTensor[int64](shape)
+	if err != nil {
+		utils.ErrorLogger.Fatalf("Failed to create input tensor: %v", err)
+		return nil, nil, nil, err
+	}
+
+	attentionTensor, err := ort.NewEmptyTensor[int64](shape)
+	if err != nil {
+		utils.ErrorLogger.Fatalf("Failed to create attention tensor: %v", err)
+		return nil, nil, nil, err
+	}
+
+	tokenTypeIdTensor, err := ort.NewTensor(shape, make([]int64, MODEL_SEQUENCE_LEN))
+	if err != nil {
+		utils.ErrorLogger.Fatalf("Failed to create type id tensor: %v", err)
+		return nil, nil, nil, err
+	}
+
+	return inputTensor, attentionTensor, tokenTypeIdTensor, nil
+}
+
+func getOutputTensor(shape ort.Shape) (*ort.Tensor[float32], error) {
+	outputTensor, err := ort.NewEmptyTensor[float32](shape)
+	if err != nil {
+		utils.ErrorLogger.Fatalf("Failed to create output tensor: %v", err)
+		return nil, err
+	}
+	return outputTensor, err
 }
