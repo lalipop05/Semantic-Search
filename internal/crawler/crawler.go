@@ -9,7 +9,7 @@ import (
 	"github.com/gocolly/colly/v2"
 )
 
-const MAXDEPTH = 2
+const MAXDEPTH = 3
 const PARALLELISM = 4
 var Count = 0
 func Crawl(url string, ch *chan storage.PagesMetaData) {
@@ -53,7 +53,7 @@ func initCrawler(maxDepth int, parallelism int) *colly.Collector {
 	c := colly.NewCollector(
 		colly.MaxDepth(maxDepth), 
 		colly.Async(true),
-		colly.AllowedDomains("www.geeksforgeeks.org"),
+		//colly.AllowedDomains("www.geeksforgeeks.org"),
 	)
 
 	c.Limit(&colly.LimitRule{

@@ -19,7 +19,7 @@ func main() {
 	start := time.Now()
 
 	go func() {
-		crawler.Crawl("https://www.geeksforgeeks.org/", &ch)
+		crawler.Crawl("https://personal.utdallas.edu/~vince/cs4365-honors/index.html", &ch)
 		close(ch)
 		fmt.Println("Web pages crawled: ", crawler.Count)
 	}()

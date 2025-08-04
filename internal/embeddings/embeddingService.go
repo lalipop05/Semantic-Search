@@ -31,8 +31,8 @@ func NewEmbeddingService() (*EmbeddingService, error) {
 	paddingParams := getPaddingParams()
 	tk.WithPadding(paddingParams)
 
-	inputShape := ort.NewShape(1, MODEL_SEQUENCE_LEN)
-	outputShape := ort.NewShape(1, MODEL_SEQUENCE_LEN, MODEL_OUTPUT_VECTOR_LEN)
+	inputShape := ort.NewShape(MODEL_BATCH_SIZE, MODEL_SEQUENCE_LEN)
+	outputShape := ort.NewShape(MODEL_BATCH_SIZE, MODEL_SEQUENCE_LEN, MODEL_OUTPUT_VECTOR_LEN)
 
 	ortObj := NewOrtObject(&inputShape, &outputShape)
 
@@ -56,6 +56,7 @@ func (es *EmbeddingService) Destroy() {
 }
 
 func (es *EmbeddingService) GenerateBatchEmbeddings(data []*storage.PagesMetaData) ([]*storage.PagesDBEntry, error) {
+	fmt.Println("Generating Tokens")
 	tokenizedPages, err := es.GetBatchTokens(data)
 	if err != nil {
 		utils.ErrorLogger.Println(err)
@@ -80,28 +81,28 @@ func (es *EmbeddingService) GenerateBatchEmbeddings(data []*storage.PagesMetaDat
 	return dbEntries, nil
 }
 
-func (es *EmbeddingService) GenerateQueryEmbedding(query string) ([][]float32, error) {
-	if query == "" {
-		return nil, fmt.Errorf("empty string")
-	}
+// func (es *EmbeddingService) GenerateQueryEmbedding(query string) ([][]float32, error) {
+// 	if query == "" {
+// 		return nil, fmt.Errorf("empty string")
+// 	}
 
-	tokens, err := es.GetQueryTokens(query)
-	if err != nil {
-		utils.ErrorLogger.Println(err)
-		return nil, err
-	}
-	if len(tokens) > 1 {
-		return nil, fmt.Errorf("input too long")
-	}
+// 	tokens, err := es.GetQueryTokens(query)
+// 	if err != nil {
+// 		utils.ErrorLogger.Println(err)
+// 		return nil, err
+// 	}
+// 	if len(tokens) > 1 {
+// 		return nil, fmt.Errorf("input too long")
+// 	}
 
-	embeddings, err := es.ProduceQueryEmbeddings(tokens)
-	if err != nil {
-		utils.ErrorLogger.Println(err)
-		return nil, err
-	}
+// 	embeddings, err := es.ProduceQueryEmbeddings(tokens)
+// 	if err != nil {
+// 		utils.ErrorLogger.Println(err)
+// 		return nil, err
+// 	}
 
-	return embeddings, nil
-}
+// 	return embeddings, nil
+// }
 
 type TokenizedPage struct {
 	Tokens []*tokenizer.Encoding
@@ -184,7 +185,7 @@ func getInputTensors(shape ort.Shape) (*ort.Tensor[int64], *ort.Tensor[int64], *
 		return nil, nil, nil, err
 	}
 
-	tokenTypeIdTensor, err := ort.NewTensor(shape, make([]int64, MODEL_SEQUENCE_LEN))
+	tokenTypeIdTensor, err := ort.NewEmptyTensor[int64](shape)
 	if err != nil {
 		utils.ErrorLogger.Fatalf("Failed to create type id tensor: %v", err)
 		return nil, nil, nil, err
