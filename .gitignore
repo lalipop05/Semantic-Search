@@ -3,3 +3,4 @@ database/
 debug/
 utils/logs/
 *.dll
+logs/

@@ -40,19 +40,25 @@ func main() {
 		panic(err)
 	}
 	defer embeddingService.Destroy()
-	
+
+	count := 0
+
 	for value := range ch {
+		count++;
 		dbEntry, err := embeddingService.GenerateBatchEmbeddings([]*storage.PagesMetaData{&value})
 		if err != nil {
 			utils.ErrorLogger.Println(err)
 			panic(err)
 		}
+
 		err = storageManager.InsertEntriesIntoDB(dbEntry)
 
 		if err != nil {
 			utils.ErrorLogger.Println(err)
 			panic(err)
 		}
+
+		fmt.Println(count)
 	}
 
 	end := time.Now()

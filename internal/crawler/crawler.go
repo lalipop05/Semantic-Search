@@ -9,7 +9,7 @@ import (
 	"github.com/gocolly/colly/v2"
 )
 
-const MAXDEPTH = 4
+const MAXDEPTH = 2
 const PARALLELISM = 4
 var Count = 0
 func Crawl(url string, ch *chan storage.PagesMetaData) {

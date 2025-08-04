@@ -58,6 +58,7 @@ func (es *EmbeddingService) ProduceEmbeddings(tokenizedPages []*TokenizedPage) (
 			populateTensor(ortObject.InputTensor, tokens.Ids)
 			populateTensor(ortObject.AttentionTensor, tokens.AttentionMask)
 
+
 			err := ortObject.Session.Run()
 			if err != nil {
 				utils.ErrorLogger.Println(err)

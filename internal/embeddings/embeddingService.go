@@ -61,13 +61,13 @@ func (es *EmbeddingService) GenerateBatchEmbeddings(data []*storage.PagesMetaDat
 		utils.ErrorLogger.Println(err)
 		return nil, err
 	}
-
+	fmt.Println("Tokens Produced")
 	embeddedPages, err := es.ProduceEmbeddings(tokenizedPages)
 	if err != nil {
 		utils.ErrorLogger.Println(err)
 		return nil, err
 	}
-
+	fmt.Println("Embeddings Produced")
 	dbEntries := make([]*storage.PagesDBEntry, 0, len(data))
 	for i := range data {
 		dbEntry := storage.PagesDBEntry{
@@ -76,6 +76,7 @@ func (es *EmbeddingService) GenerateBatchEmbeddings(data []*storage.PagesMetaDat
 		}
 		dbEntries = append(dbEntries, &dbEntry)
 	}
+	fmt.Println("Returning...")
 	return dbEntries, nil
 }
 
