@@ -511,3 +511,4 @@ INFO: 2025/08/04 12:49:23 crawler.go:74:     3 - Visiting https://www.turnitin.c
 INFO: 2025/08/04 12:49:23 crawler.go:74:     3 - Visiting https://medium.com/@gradescope
 INFO: 2025/08/04 12:49:23 crawler.go:74:     3 - Visiting https://www.gradescope.com/tos
 INFO: 2025/08/04 12:49:23 crawler.go:74:     3 - Visiting https://www.gradescope.com/privacy
+INFO: 2025/08/04 17:10:56 database.go:43: vec_version=v0.1.6

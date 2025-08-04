@@ -38,7 +38,7 @@ func NewEmbeddingService() (*EmbeddingService, error) {
 
 	return &EmbeddingService{
 		tokenizer: tk,
-		ortObj: ortObj,
+		ortObj:    ortObj,
 	}, err
 }
 
@@ -56,19 +56,19 @@ func (es *EmbeddingService) Destroy() {
 }
 
 func (es *EmbeddingService) GenerateBatchEmbeddings(data []*storage.PagesMetaData) ([]*storage.PagesDBEntry, error) {
-	fmt.Println("Generating Tokens")
+
 	tokenizedPages, err := es.GetBatchTokens(data)
 	if err != nil {
 		utils.ErrorLogger.Println(err)
 		return nil, err
 	}
-	fmt.Println("Tokens Produced")
+
 	embeddedPages, err := es.ProduceEmbeddings(tokenizedPages)
 	if err != nil {
 		utils.ErrorLogger.Println(err)
 		return nil, err
 	}
-	fmt.Println("Embeddings Produced")
+
 	dbEntries := make([]*storage.PagesDBEntry, 0, len(data))
 	for i := range data {
 		dbEntry := storage.PagesDBEntry{
@@ -81,28 +81,28 @@ func (es *EmbeddingService) GenerateBatchEmbeddings(data []*storage.PagesMetaDat
 	return dbEntries, nil
 }
 
-// func (es *EmbeddingService) GenerateQueryEmbedding(query string) ([][]float32, error) {
-// 	if query == "" {
-// 		return nil, fmt.Errorf("empty string")
-// 	}
+func (es *EmbeddingService) GenerateQueryEmbedding(query string) ([][]float32, error) {
+	if query == "" {
+		return nil, fmt.Errorf("empty string")
+	}
 
-// 	tokens, err := es.GetQueryTokens(query)
-// 	if err != nil {
-// 		utils.ErrorLogger.Println(err)
-// 		return nil, err
-// 	}
-// 	if len(tokens) > 1 {
-// 		return nil, fmt.Errorf("input too long")
-// 	}
+	tokens, err := es.GetQueryTokens(query)
+	if err != nil {
+		utils.ErrorLogger.Println(err)
+		return nil, err
+	}
+	if len(tokens) > 1 {
+		return nil, fmt.Errorf("input too long")
+	}
 
-// 	embeddings, err := es.ProduceQueryEmbeddings(tokens)
-// 	if err != nil {
-// 		utils.ErrorLogger.Println(err)
-// 		return nil, err
-// 	}
+	embeddings, err := es.ProduceQueryEmbeddings(tokens)
+	if err != nil {
+		utils.ErrorLogger.Println(err)
+		return nil, err
+	}
 
-// 	return embeddings, nil
-// }
+	return embeddings, nil
+}
 
 type TokenizedPage struct {
 	Tokens []*tokenizer.Encoding

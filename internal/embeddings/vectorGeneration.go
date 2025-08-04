@@ -38,28 +38,33 @@ func getAttMask(tp *tokenizer.Encoding) []int {
 	return tp.AttentionMask
 }
 
-// func (es *EmbeddingService) ProduceQueryEmbeddings(tokens []*tokenizer.Encoding) ([][]float32, error) {
-// 	var response [][]float32
+func (es *EmbeddingService) ProduceQueryEmbeddings(tokens []*tokenizer.Encoding) ([][]float32, error) {
+	ortObject := es.ortObj
+	chunks := len(tokens)
+	var response [][]float32
 
-// 	ortObject := es.ortObj
 
-// 	for _, token := range tokens {
-// 		populateTensor(ortObject.InputTensor, TokenizedPage)
-// 		populateTensor(ortObject.AttentionTensor, token.AttentionMask)
+	for i := 0; i < chunks; i++ {
+		populateTensor(ortObject.InputTensor, &TokenizedPage{tokens}, getIds, i)
+		populateTensor(ortObject.AttentionTensor, &TokenizedPage{tokens}, getAttMask, i)
 
-// 		err := ortObject.Session.Run()
-// 		if (err != nil) {
-// 			utils.ErrorLogger.Println(err)
-// 			return nil, err
-// 		}
-// 		outputData := ortObject.OutputTensor.GetData()
+		err := ortObject.Session.Run()
+		if err != nil {
+			utils.ErrorLogger.Fatal(err)
+		}
 
-// 		temp := make([]float32, MODEL_OUTPUT_VECTOR_LEN)
-// 		copy(temp, outputData[:MODEL_OUTPUT_VECTOR_LEN])
-// 		response = append(response, temp)
-// 	}
-// 	return response, nil
-// }
+		outputData := ortObject.OutputTensor.GetData()
+		increment := MODEL_OUTPUT_VECTOR_LEN*MODEL_SEQUENCE_LEN
+		end := min(chunks-i, int(MODEL_BATCH_SIZE))
+		for j := range end {
+			temp := make([]float32, MODEL_OUTPUT_VECTOR_LEN)
+			start := j*increment
+			copy(temp, outputData[start:start+MODEL_OUTPUT_VECTOR_LEN])
+			response = append(response, temp)
+		}
+	}
+	return response, nil
+}
 
 func (es *EmbeddingService) producePageEmbeddings(tokenizedPage *TokenizedPage) [][]float32 {
 	ortObject := es.ortObj
@@ -78,7 +83,7 @@ func (es *EmbeddingService) producePageEmbeddings(tokenizedPage *TokenizedPage) 
 		outputData := ortObject.OutputTensor.GetData()
 		increment := MODEL_OUTPUT_VECTOR_LEN*MODEL_SEQUENCE_LEN
 		end := min(chunks-i, int(MODEL_BATCH_SIZE))
-		for j := 0; j < end; j++ {
+		for j := range end {
 			temp := make([]float32, MODEL_OUTPUT_VECTOR_LEN)
 			start := j*increment
 			copy(temp, outputData[start:start+MODEL_OUTPUT_VECTOR_LEN])
