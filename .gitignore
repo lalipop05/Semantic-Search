@@ -4,3 +4,5 @@ debug/
 utils/logs/
 *.dll
 logs/
+cmd/logs
+cmd/database
