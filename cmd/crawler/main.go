@@ -4,13 +4,12 @@ import (
 	"fmt"
 	"time"
 
+	"mySearchEngine/internal/config"
 	"mySearchEngine/internal/crawler"
 	"mySearchEngine/internal/embeddings"
 	"mySearchEngine/internal/storage"
 	"mySearchEngine/internal/utils"
 )
-
-const DBDRIVER string = "sqlite3"
 
 func main() {
 
@@ -19,16 +18,21 @@ func main() {
 	start := time.Now()
 
 	go func() {
-		crawler.Crawl("https://personal.utdallas.edu/~vince/cs4365-honors/index.html", &ch)
+		urlsToCrawl := []string{
+			"https://personal.utdallas.edu/~vince/cs4365-honors/index.html",
+		}
+
+		allowDomains := [][]string {
+			{},
+		}
+
+		crawler.CrawlUrls(urlsToCrawl, allowDomains, 0, 4, &ch)
 		close(ch)
-		fmt.Println("Web pages crawled: ", crawler.Count)
+		utils.InfoLogger.Println("Crawling finished")
 	}()
 
-	storageManager, err := storage.SetUpDataBase(DBDRIVER)
+	storageManager, err := storage.SetUpDataBase(config.DBDRIVER)
 	if err != nil {
-		if storageManager != nil {
-			storageManager.Close()
-		}
 		utils.ErrorLogger.Println(err)
 		panic(err)
 	}
@@ -58,8 +62,10 @@ func main() {
 			panic(err)
 		}
 
-		fmt.Println(count)
+		utils.InfoLogger.Println(count)
+		
 	}
+	utils.InfoLogger.Println(count)
 
 	end := time.Now()
 	diff := end.Sub(start)

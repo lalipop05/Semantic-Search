@@ -1,6 +1,7 @@
 package embeddings
 
 import (
+	"mySearchEngine/internal/config"
 	"mySearchEngine/internal/storage"
 	"mySearchEngine/internal/utils"
 	"strings"
@@ -8,15 +9,13 @@ import (
 	"github.com/sugarme/tokenizer"
 )
 
-const TOKENIZER_STRIDE_LEN = 64
-
 func (es *EmbeddingService) GetBatchTokens(data []*storage.PagesMetaData) ([]*TokenizedPage, error) {
 	n := len(data)
-	if (n == 0) {
-		return nil, nil
+	if n == 0 {
+		return []*TokenizedPage{}, nil
 	}
 	batchEncodings, err := es.generateBatchTokens(data)
-	if (err != nil) {
+	if err != nil {
 		utils.ErrorLogger.Println(err)
 		return nil, err
 	}
@@ -25,8 +24,8 @@ func (es *EmbeddingService) GetBatchTokens(data []*storage.PagesMetaData) ([]*To
 
 	for _, enc := range batchEncodings {
 		processed := es.ProcessEncoding(enc)
-		if (processed != nil) {
-			tokenizedPages = append(tokenizedPages, &TokenizedPage{processed})
+		if processed != nil {
+			tokenizedPages = append(tokenizedPages, &TokenizedPage{processed, len(processed)})
 		}
 	}
 	return tokenizedPages, nil
@@ -36,32 +35,32 @@ func (es *EmbeddingService) ProcessEncoding(encoding tokenizer.Encoding) []*toke
 	const startToken int = 101
 	const endToken int = 102
 	n := encoding.Len()
-	if (n == MODEL_SEQUENCE_LEN) {
+	if n == config.MODEL_SEQUENCE_LEN {
 		return []*tokenizer.Encoding{&encoding}
 	} else {
 		splitEncodings := make([]*tokenizer.Encoding, 0)
-		
+
 		start := 1
-		for ; start+MODEL_SEQUENCE_LEN-2 < n-1; {
+		for start+config.MODEL_SEQUENCE_LEN-2 < n-1 {
 			temp := tokenizer.Encoding{
-				Ids: []int{startToken},
+				Ids:           []int{startToken},
 				AttentionMask: []int{1},
 			}
-			temp.Ids = append(temp.Ids, encoding.Ids[start:start+MODEL_SEQUENCE_LEN-2]...)
-			temp.AttentionMask = append(temp.AttentionMask, encoding.AttentionMask[start:start+MODEL_SEQUENCE_LEN-2]...)
+			temp.Ids = append(temp.Ids, encoding.Ids[start:start+config.MODEL_SEQUENCE_LEN-2]...)
+			temp.AttentionMask = append(temp.AttentionMask, encoding.AttentionMask[start:start+config.MODEL_SEQUENCE_LEN-2]...)
 			temp.Ids = append(temp.Ids, endToken)
 			temp.AttentionMask = append(temp.AttentionMask, 1)
 			splitEncodings = append(splitEncodings, &temp)
-			
-			start += MODEL_SEQUENCE_LEN-2-TOKENIZER_STRIDE_LEN
+
+			start += config.MODEL_SEQUENCE_LEN - 2 - config.TOKENIZER_STRIDE_LEN
 		}
 		temp := tokenizer.Encoding{
-			Ids: []int{startToken},
+			Ids:           []int{startToken},
 			AttentionMask: []int{1},
 		}
 		temp.Ids = append(temp.Ids, encoding.Ids[start:]...)
 		temp.AttentionMask = append(temp.AttentionMask, encoding.AttentionMask[start:]...)
-		
+
 		temp = tokenizer.PadEncodings([]tokenizer.Encoding{temp}, *getPaddingParams())[0]
 
 		return append(splitEncodings, &temp)
@@ -72,7 +71,7 @@ func (es *EmbeddingService) GetQueryTokens(query string) ([]*tokenizer.Encoding,
 	inputSequence := tokenizer.NewInputSequence(query)
 	encodingInput := tokenizer.NewSingleEncodeInput(inputSequence)
 	encoding, err := es.tokenizer.Encode(encodingInput, true)
-	if (err != nil) {
+	if err != nil {
 		utils.ErrorLogger.Println(err)
 		return nil, err
 	}
@@ -80,11 +79,10 @@ func (es *EmbeddingService) GetQueryTokens(query string) ([]*tokenizer.Encoding,
 	return processedEncoding, nil
 }
 
-
 func (es *EmbeddingService) generateBatchTokens(data []*storage.PagesMetaData) ([]tokenizer.Encoding, error) {
 	var encodingInput []tokenizer.EncodeInput = make([]tokenizer.EncodeInput, 0, len(data))
 	for i, pageData := range data {
-		if (pageData == nil) {
+		if pageData == nil {
 			utils.WarningLogger.Printf("pageData %v is nil", i)
 			continue
 		}
@@ -93,13 +91,14 @@ func (es *EmbeddingService) generateBatchTokens(data []*storage.PagesMetaData) (
 		encodingInput = append(encodingInput, tokenizer.NewSingleEncodeInput(inputSeq))
 	}
 	encoding, err := es.tokenizer.EncodeBatch(encodingInput, true)
-	if (err != nil) {
+	if err != nil {
 		utils.ErrorLogger.Println(err)
 		return nil, err
 	}
 	return encoding, nil
 }
 
+// Create one string that contains the meta data and contents of the web page
 func ToText(page *storage.PagesMetaData) string {
 	var parts []string
 
@@ -128,4 +127,3 @@ func ToText(page *storage.PagesMetaData) string {
 	return builder.String()
 
 }
-

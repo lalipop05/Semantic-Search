@@ -9,23 +9,27 @@ import (
 	"github.com/gocolly/colly/v2"
 )
 
-const MAXDEPTH = 3
-const PARALLELISM = 4
-var Count = 0
-func Crawl(url string, ch *chan storage.PagesMetaData) {
-	
-	c := initCrawler(MAXDEPTH, PARALLELISM)
-
-	c.OnHTML("a[href]", onATagCallBack())
-
-	c.OnHTML("html", onHTMLTagCallBack(ch))
-
-	c.OnRequest(onRequestCallBack())
-
-	c.Visit(url)
-	c.Wait()
+// Called on every <a> tag encountered while crawling a web page
+var onATagCallBack = func(e *colly.HTMLElement) {
+	e.Request.Visit(e.Attr("href"))
 }
 
+// Called everytime a HTTP request is sent
+var onRequestCallBack = func(r *colly.Request) {
+	s := ""
+	for i := 0; i < r.Depth-1; i++ {
+		s += "  "
+	}
+	s += fmt.Sprintf("%d - Visiting %v", r.Depth, r.URL.String())
+	utils.CrawlLogger.Println(s)
+}
+
+var onErrorCallBack = func(r *colly.Response, err error) {
+	utils.WarningLogger.Printf("Request URL: %s failed with error: %v\n", r.Request.URL, err)
+}
+
+// Called on every HTML tag
+// All of the pages data is sent though a channel
 func onHTMLTagCallBack(ch *chan storage.PagesMetaData) func(e *colly.HTMLElement) {
 	return func(e *colly.HTMLElement) {
 		metaData := storage.PagesMetaData{
@@ -43,38 +47,46 @@ func onHTMLTagCallBack(ch *chan storage.PagesMetaData) func(e *colly.HTMLElement
 	}
 }
 
-func onATagCallBack() func(e *colly.HTMLElement) {
-	return func(e *colly.HTMLElement) {
-		e.Request.Visit(e.Attr("href"))
+// urls contains the urls to be visited
+// allowedDomains contains a slice of allowed domains for each url
+// outputChannel is the channel though which you will recieve the pages meta data
+func CrawlUrls(urls []string, allowedDomains [][]string, parallelism int, maxDepth int, outputChannel *chan storage.PagesMetaData) {
+	if len(urls) != len(allowedDomains) {
+		utils.ErrorLogger.Fatal("len(url) is not equal to len(allowedDomains)")
 	}
-}
 
-func initCrawler(maxDepth int, parallelism int) *colly.Collector {
-	c := colly.NewCollector(
-		colly.MaxDepth(maxDepth), 
-		colly.Async(true),
-		//colly.AllowedDomains("www.geeksforgeeks.org"),
-	)
-
-	c.Limit(&colly.LimitRule{
+	isAsync := parallelism != 0
+	limitRule := &colly.LimitRule{
 		DomainGlob:  "*",
 		Parallelism: parallelism,
-	})
+	}
 
-	return c
-}
+	// create a new collector of each url and visit each url individually
+	for i := range urls {
+		opts := []colly.CollectorOption{
+			colly.MaxDepth(maxDepth),
+			colly.Async(isAsync),
+		}
+		if (len(allowedDomains[i]) > 0) {
+			opts = append(opts, colly.AllowedDomains(allowedDomains[i]...))
+		}
+		c := colly.NewCollector(
+			opts...,
+		)
+		
+		if (isAsync) {
+			c.Limit(limitRule)
+		}
 
-func onRequestCallBack() func(*colly.Request) {
-	return func(r *colly.Request) {
-		s := ""
-		for i := 0; i < r.Depth-1; i++ {
-			s += "  "
-		}
-		s += fmt.Sprintf("%d - Visiting %v", r.Depth, r.URL.String())
-		utils.InfoLogger.Println(s)
-		Count++
-		if (Count%1000 == 0) {
-			fmt.Println("Webpages crawled: ", Count)
-		}
+		c.OnHTML("a[href]", onATagCallBack)
+
+		c.OnHTML("html", onHTMLTagCallBack(outputChannel))
+
+		c.OnRequest(onRequestCallBack)
+
+		c.OnError(onErrorCallBack)
+
+		c.Visit(urls[i])
+		c.Wait()
 	}
 }

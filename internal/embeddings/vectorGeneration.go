@@ -1,23 +1,17 @@
 package embeddings
 
 import (
+	"mySearchEngine/internal/config"
 	"mySearchEngine/internal/utils"
 
 	"github.com/sugarme/tokenizer"
 	ort "github.com/yalue/onnxruntime_go"
 )
 
-const MODEL_SEQUENCE_LEN = 512
-const MODEL_OUTPUT_VECTOR_LEN = 384
-const MODEL_BATCH_SIZE = 1
-
-var MODEL_INPUT_NAMES = []string{"input_ids", "attention_mask", "token_type_ids"}
-var MODEL_OUTPUT_NAMES = []string{"last_hidden_state"}
-
 func populateTensor(tensor *ort.Tensor[int64], tokenizedPage *TokenizedPage, classifier func(*tokenizer.Encoding) []int, index int) {
 	tensorData := tensor.GetData()
 	
-	end := min(len(tokenizedPage.Tokens), index+int(MODEL_BATCH_SIZE))
+	end := min(len(tokenizedPage.Tokens), index+int(config.MODEL_BATCH_SIZE))
 
 	for ; index < end; index++ {
 		currentEncoding := tokenizedPage.Tokens[index]
@@ -45,8 +39,8 @@ func (es *EmbeddingService) ProduceQueryEmbeddings(tokens []*tokenizer.Encoding)
 
 
 	for i := 0; i < chunks; i++ {
-		populateTensor(ortObject.InputTensor, &TokenizedPage{tokens}, getIds, i)
-		populateTensor(ortObject.AttentionTensor, &TokenizedPage{tokens}, getAttMask, i)
+		populateTensor(ortObject.InputTensor, &TokenizedPage{tokens, len(tokens)}, getIds, i)
+		populateTensor(ortObject.AttentionTensor, &TokenizedPage{tokens, len(tokens)}, getAttMask, i)
 
 		err := ortObject.Session.Run()
 		if err != nil {
@@ -54,12 +48,12 @@ func (es *EmbeddingService) ProduceQueryEmbeddings(tokens []*tokenizer.Encoding)
 		}
 
 		outputData := ortObject.OutputTensor.GetData()
-		increment := MODEL_OUTPUT_VECTOR_LEN*MODEL_SEQUENCE_LEN
-		end := min(chunks-i, int(MODEL_BATCH_SIZE))
+		increment := config.MODEL_OUTPUT_VECTOR_LEN*config.MODEL_SEQUENCE_LEN
+		end := min(chunks-i, int(config.MODEL_BATCH_SIZE))
 		for j := range end {
-			temp := make([]float32, MODEL_OUTPUT_VECTOR_LEN)
+			temp := make([]float32, config.MODEL_OUTPUT_VECTOR_LEN)
 			start := j*increment
-			copy(temp, outputData[start:start+MODEL_OUTPUT_VECTOR_LEN])
+			copy(temp, outputData[start:start+config.MODEL_OUTPUT_VECTOR_LEN])
 			response = append(response, temp)
 		}
 	}
@@ -71,7 +65,7 @@ func (es *EmbeddingService) producePageEmbeddings(tokenizedPage *TokenizedPage) 
 	chunks := len(tokenizedPage.Tokens)
 	pageEmbeddings := make([][]float32, 0, chunks)
 
-	for i := 0; i < chunks; i+=int(MODEL_BATCH_SIZE) {
+	for i := 0; i < chunks; i+=int(config.MODEL_BATCH_SIZE) {
 		populateTensor(ortObject.InputTensor, tokenizedPage, getIds, i)
 		populateTensor(ortObject.AttentionTensor, tokenizedPage, getAttMask, i)
 
@@ -81,12 +75,12 @@ func (es *EmbeddingService) producePageEmbeddings(tokenizedPage *TokenizedPage) 
 		}
 
 		outputData := ortObject.OutputTensor.GetData()
-		increment := MODEL_OUTPUT_VECTOR_LEN*MODEL_SEQUENCE_LEN
-		end := min(chunks-i, int(MODEL_BATCH_SIZE))
+		increment := config.MODEL_OUTPUT_VECTOR_LEN*config.MODEL_SEQUENCE_LEN
+		end := min(chunks-i, int(config.MODEL_BATCH_SIZE))
 		for j := range end {
-			temp := make([]float32, MODEL_OUTPUT_VECTOR_LEN)
+			temp := make([]float32, config.MODEL_OUTPUT_VECTOR_LEN)
 			start := j*increment
-			copy(temp, outputData[start:start+MODEL_OUTPUT_VECTOR_LEN])
+			copy(temp, outputData[start:start+config.MODEL_OUTPUT_VECTOR_LEN])
 			pageEmbeddings = append(pageEmbeddings, temp)
 		}
 

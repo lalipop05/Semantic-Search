@@ -19,7 +19,8 @@ type PagesMetaData struct {
 
 type PagesDBEntry struct {
 	MetaData   *PagesMetaData
-	Embeddings []*[]float32
+	Embeddings [][]float32
+	Chunk      int
 }
 
 type InMemoryMetaData struct {
@@ -36,8 +37,10 @@ type DistanceMetric struct {
 
 type CrawledPagesCache map[string]InMemoryMetaData
 
-func (cache CrawledPagesCache) Exists(data *PagesMetaData) bool {
-	metaData, exists := cache[data.URL]
+// Returns true if the web page passed in has not changed since the crawler
+// indexed the page before else false
+func (cache *CrawledPagesCache) Exists(data *PagesMetaData) bool {
+	metaData, exists := (*cache)[data.URL]
 
 	if !exists {
 		return false
