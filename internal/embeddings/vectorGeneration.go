@@ -1,6 +1,7 @@
 package embeddings
 
 import (
+	"fmt"
 	"mySearchEngine/internal/config"
 	"mySearchEngine/internal/utils"
 
@@ -60,7 +61,7 @@ func (es *EmbeddingService) ProduceQueryEmbeddings(tokens []*tokenizer.Encoding)
 	return response, nil
 }
 
-func (es *EmbeddingService) producePageEmbeddings(tokenizedPage *TokenizedPage) [][]float32 {
+func (es *EmbeddingService) producePageEmbeddings(tokenizedPage *TokenizedPage) ([][]float32, error) {
 	ortObject := es.ortObj
 	chunks := len(tokenizedPage.Tokens)
 	pageEmbeddings := make([][]float32, 0, chunks)
@@ -71,7 +72,7 @@ func (es *EmbeddingService) producePageEmbeddings(tokenizedPage *TokenizedPage) 
 
 		err := ortObject.Session.Run()
 		if err != nil {
-			utils.ErrorLogger.Fatal(err)
+			return nil, fmt.Errorf("could not run ort session\n%w", err)
 		}
 
 		outputData := ortObject.OutputTensor.GetData()
@@ -86,7 +87,7 @@ func (es *EmbeddingService) producePageEmbeddings(tokenizedPage *TokenizedPage) 
 
 	}
 
-	return pageEmbeddings
+	return pageEmbeddings, nil
 }
 
 func (es *EmbeddingService) ProduceEmbeddings(tokenizedPages []*TokenizedPage) ([]*EmbeddedPage, error) {
@@ -96,6 +97,7 @@ func (es *EmbeddingService) ProduceEmbeddings(tokenizedPages []*TokenizedPage) (
 		pageEmbeddings := es.producePageEmbeddings(tokenizedPage)
 		embeddedPage := EmbeddedPage{
 			Embeddings: pageEmbeddings,
+			Chunks: tokenizedPage.Chunks,
 		}
 		embeddedPages = append(embeddedPages, &embeddedPage)
 	}

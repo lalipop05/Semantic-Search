@@ -12,10 +12,17 @@ import (
 	ort "github.com/yalue/onnxruntime_go"
 )
 
+type Pair[U any, V any] struct {
+	First U
+	Second V
+}
+
 type EmbeddingService struct {
-	tokenizer *tokenizer.Tokenizer
-	ortObj    *OrtObject
-	wg		  sync.WaitGroup
+	tokenizer     *tokenizer.Tokenizer
+	ortObj        *OrtObject
+	wg            *sync.WaitGroup
+	embeddingChan *chan *Pair[*TokenizedPage, *storage.PagesMetaData]
+	outputChan    *chan *storage.PagesDBEntry
 }
 
 func NewEmbeddingService() (*EmbeddingService, error) {
@@ -33,21 +40,29 @@ func NewEmbeddingService() (*EmbeddingService, error) {
 	outputShape := ort.NewShape(config.MODEL_BATCH_SIZE, config.MODEL_SEQUENCE_LEN, config.MODEL_OUTPUT_VECTOR_LEN)
 
 	err = SetUpOrtEnv()
-	if (err != nil) {
+	if err != nil {
 		return nil, fmt.Errorf("failed to set up ort environment\n%w", err)
 	}
 
-	// var wg sync.WaitGroup
-	// wg.Add(config.MODEL_INSTANCES)
-	// SetUpAsyncEmbeddingProd(&wg, config.MODEL_INSTANCES)
+	var wg sync.WaitGroup
+	wg.Add(config.MODEL_INSTANCES)
 
 	// handles inputs and outputs to the onnx model and running it
 	ortObj := NewOrtObject(&inputShape, &outputShape)
 
-	return &EmbeddingService{
-		tokenizer: tk,
-		ortObj:    ortObj,
-	}, err
+	embeddingChan := make(chan *Pair[*TokenizedPage, *storage.PagesMetaData], 16)
+
+	es := &EmbeddingService{
+		tokenizer:     tk,
+		ortObj:        ortObj,
+		wg:            &wg,
+		embeddingChan: &embeddingChan,
+	}
+
+	es.SetUpAsyncEmbeddingProd(config.MODEL_INSTANCES, func(err error) {
+		utils.ErrorLogger.Println("problem with async embedding\n%w", err)
+	})
+
 }
 
 func getPaddingParams() *tokenizer.PaddingParams {
@@ -63,6 +78,19 @@ func getPaddingParams() *tokenizer.PaddingParams {
 func (es *EmbeddingService) Destroy() {
 	es.ortObj.Destroy()
 	ort.DestroyEnvironment()
+}
+
+func (es *EmbeddingService) AsyncGenerateBatchEmbeddings(data []*storage.PagesMetaData) error {
+	tokenizedPages, err := es.GetBatchTokens(data)
+	if err != nil {
+		return fmt.Errorf("failed to get batch tokens\n%w", err)
+	}
+
+	for i := range tokenizedPages {
+		*es.embeddingChan <- &Pair[*TokenizedPage, *storage.PagesMetaData]{tokenizedPages[i], data[i]}
+	}
+
+	return nil
 }
 
 func (es *EmbeddingService) GenerateBatchEmbeddings(data []*storage.PagesMetaData) ([]*storage.PagesDBEntry, error) {
@@ -138,12 +166,26 @@ func SetUpOrtEnv() error {
 	return err
 }
 
-// func SetUpAsyncEmbeddingProd(wg *sync.WaitGroup, n int, onError func(error)) {
-// 	go func() {
-		
-// 	}()
-// }
-
+func (es *EmbeddingService) SetUpAsyncEmbeddingProd(n int, onError func(error)) {
+	go func() {
+		for pair := range *es.embeddingChan {
+			tokenizedPage := pair.First
+			metaData := pair.Second
+			pageEmbeddings, err := es.producePageEmbeddings(tokenizedPage)
+			if (err != nil) {
+				onError(err)
+			}
+			embeddedPage := EmbeddedPage{
+				Embeddings: pageEmbeddings,
+				Chunks: tokenizedPage.Chunks,
+			}
+			
+			*es.outputChan <- &embeddedPage
+			
+		}
+		es.wg.Done()
+	}()
+}
 
 func NewOrtObject(inputShape *ort.Shape, outputShape *ort.Shape) *OrtObject {
 	// input tensors
