@@ -20,4 +20,4 @@ const DATABASE_NAME = "tester.db"
 
 const DBDRIVER string = "sqlite3"
 
-const MODEL_INSTANCES = 6
+const MODEL_INSTANCES = 1

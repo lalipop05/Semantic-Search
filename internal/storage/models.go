@@ -20,7 +20,7 @@ type PagesMetaData struct {
 type PagesDBEntry struct {
 	MetaData   *PagesMetaData
 	Embeddings [][]float32
-	Chunk      int
+	Chunks      int
 }
 
 type InMemoryMetaData struct {

@@ -13,16 +13,15 @@ import (
 )
 
 type Pair[U any, V any] struct {
-	First U
+	First  U
 	Second V
 }
 
 type EmbeddingService struct {
 	tokenizer     *tokenizer.Tokenizer
-	ortObj        *OrtObject
 	wg            *sync.WaitGroup
 	embeddingChan *chan *Pair[*TokenizedPage, *storage.PagesMetaData]
-	outputChan    *chan *storage.PagesDBEntry
+	OutputChan    *chan *storage.PagesDBEntry
 }
 
 func NewEmbeddingService() (*EmbeddingService, error) {
@@ -36,32 +35,29 @@ func NewEmbeddingService() (*EmbeddingService, error) {
 	paddingParams := getPaddingParams()
 	tk.WithPadding(paddingParams)
 
-	inputShape := ort.NewShape(config.MODEL_BATCH_SIZE, config.MODEL_SEQUENCE_LEN)
-	outputShape := ort.NewShape(config.MODEL_BATCH_SIZE, config.MODEL_SEQUENCE_LEN, config.MODEL_OUTPUT_VECTOR_LEN)
-
 	err = SetUpOrtEnv()
 	if err != nil {
 		return nil, fmt.Errorf("failed to set up ort environment\n%w", err)
 	}
 
 	var wg sync.WaitGroup
-	wg.Add(config.MODEL_INSTANCES)
-
-	// handles inputs and outputs to the onnx model and running it
-	ortObj := NewOrtObject(&inputShape, &outputShape)
 
 	embeddingChan := make(chan *Pair[*TokenizedPage, *storage.PagesMetaData], 16)
 
+	outputChan := make(chan *storage.PagesDBEntry, 4)
+
 	es := &EmbeddingService{
 		tokenizer:     tk,
-		ortObj:        ortObj,
 		wg:            &wg,
 		embeddingChan: &embeddingChan,
+		OutputChan:    &outputChan,
 	}
 
 	es.SetUpAsyncEmbeddingProd(config.MODEL_INSTANCES, func(err error) {
 		utils.ErrorLogger.Println("problem with async embedding\n%w", err)
 	})
+
+	return es, nil
 
 }
 
@@ -76,7 +72,6 @@ func getPaddingParams() *tokenizer.PaddingParams {
 }
 
 func (es *EmbeddingService) Destroy() {
-	es.ortObj.Destroy()
 	ort.DestroyEnvironment()
 }
 
@@ -130,7 +125,11 @@ func (es *EmbeddingService) GenerateQueryEmbedding(query string) ([][]float32, e
 		return nil, fmt.Errorf("input too long")
 	}
 
-	embeddings, err := es.ProduceQueryEmbeddings(tokens)
+	inputShape := ort.NewShape(config.MODEL_BATCH_SIZE, config.MODEL_SEQUENCE_LEN)
+	outputShape := ort.NewShape(config.MODEL_BATCH_SIZE, config.MODEL_SEQUENCE_LEN, config.MODEL_OUTPUT_VECTOR_LEN)
+	ortObject := NewOrtObject(&inputShape, &outputShape)
+
+	embeddings, err := es.ProduceQueryEmbeddings(tokens, ortObject)
 	if err != nil {
 		utils.ErrorLogger.Println(err)
 		return nil, err
@@ -167,24 +166,42 @@ func SetUpOrtEnv() error {
 }
 
 func (es *EmbeddingService) SetUpAsyncEmbeddingProd(n int, onError func(error)) {
-	go func() {
-		for pair := range *es.embeddingChan {
-			tokenizedPage := pair.First
-			metaData := pair.Second
-			pageEmbeddings, err := es.producePageEmbeddings(tokenizedPage)
-			if (err != nil) {
-				onError(err)
+	for ; n > 0; n-- {
+		i := n
+		utils.InfoLogger.Println("Setting up ", i)
+		go func() {
+			inputShape := ort.NewShape(config.MODEL_BATCH_SIZE, config.MODEL_SEQUENCE_LEN)
+			outputShape := ort.NewShape(config.MODEL_BATCH_SIZE, config.MODEL_SEQUENCE_LEN, config.MODEL_OUTPUT_VECTOR_LEN)
+			ortObject := NewOrtObject(&inputShape, &outputShape)
+			es.wg.Add(1)
+			for pair := range *es.embeddingChan {
+				tokenizedPage := pair.First
+				metaData := pair.Second
+				pageEmbeddings, err := es.producePageEmbeddings(tokenizedPage, ortObject)
+				if err != nil {
+					onError(err)
+				}
+				embeddedPage := EmbeddedPage{
+					Embeddings: pageEmbeddings,
+					Chunks:     tokenizedPage.Chunks,
+				}
+				utils.InfoLogger.Println("DONE BY: ", i)
+				*es.OutputChan <- &storage.PagesDBEntry{
+					MetaData:   metaData,
+					Embeddings: embeddedPage.Embeddings,
+					Chunks:     embeddedPage.Chunks,
+				}
 			}
-			embeddedPage := EmbeddedPage{
-				Embeddings: pageEmbeddings,
-				Chunks: tokenizedPage.Chunks,
-			}
-			
-			*es.outputChan <- &embeddedPage
-			
-		}
-		es.wg.Done()
-	}()
+			ortObject.Destroy()
+			es.wg.Done()
+		}()
+	}
+
+}
+
+func (es *EmbeddingService) Wait() {
+	close(*es.embeddingChan)
+	es.wg.Wait()
 }
 
 func NewOrtObject(inputShape *ort.Shape, outputShape *ort.Shape) *OrtObject {

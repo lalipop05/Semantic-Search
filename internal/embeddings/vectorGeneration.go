@@ -33,8 +33,7 @@ func getAttMask(tp *tokenizer.Encoding) []int {
 	return tp.AttentionMask
 }
 
-func (es *EmbeddingService) ProduceQueryEmbeddings(tokens []*tokenizer.Encoding) ([][]float32, error) {
-	ortObject := es.ortObj
+func (es *EmbeddingService) ProduceQueryEmbeddings(tokens []*tokenizer.Encoding, ortObject *OrtObject) ([][]float32, error) {
 	chunks := len(tokens)
 	var response [][]float32
 
@@ -61,8 +60,7 @@ func (es *EmbeddingService) ProduceQueryEmbeddings(tokens []*tokenizer.Encoding)
 	return response, nil
 }
 
-func (es *EmbeddingService) producePageEmbeddings(tokenizedPage *TokenizedPage) ([][]float32, error) {
-	ortObject := es.ortObj
+func (es *EmbeddingService) producePageEmbeddings(tokenizedPage *TokenizedPage, ortObject *OrtObject) ([][]float32, error) {
 	chunks := len(tokenizedPage.Tokens)
 	pageEmbeddings := make([][]float32, 0, chunks)
 
@@ -92,15 +90,21 @@ func (es *EmbeddingService) producePageEmbeddings(tokenizedPage *TokenizedPage) 
 
 func (es *EmbeddingService) ProduceEmbeddings(tokenizedPages []*TokenizedPage) ([]*EmbeddedPage, error) {
 	embeddedPages := make([]*EmbeddedPage, 0, len(tokenizedPages))
-
+	inputShape := ort.NewShape(config.MODEL_BATCH_SIZE, config.MODEL_SEQUENCE_LEN)
+	outputShape := ort.NewShape(config.MODEL_BATCH_SIZE, config.MODEL_SEQUENCE_LEN, config.MODEL_OUTPUT_VECTOR_LEN)
+	ortObject := NewOrtObject(&inputShape, &outputShape)
+	defer ortObject.Destroy()
 	for _, tokenizedPage := range tokenizedPages {
-		pageEmbeddings := es.producePageEmbeddings(tokenizedPage)
+		pageEmbeddings, err := es.producePageEmbeddings(tokenizedPage, ortObject)
+		if (err != nil) {
+			return nil, fmt.Errorf("coutl not produce page embeddings")
+		}
 		embeddedPage := EmbeddedPage{
 			Embeddings: pageEmbeddings,
 			Chunks: tokenizedPage.Chunks,
 		}
 		embeddedPages = append(embeddedPages, &embeddedPage)
 	}
-
+	
 	return embeddedPages, nil
 }
